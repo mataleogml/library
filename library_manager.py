@@ -1,26 +1,39 @@
 from flask import Flask, request, jsonify, render_template_string, redirect, url_for
 import sqlite3
 import json
+import os
+import logging
 
 app = Flask(__name__)
 
-# Initialize SQLite database
-def init_db():
-    conn = sqlite3.connect('library.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS books
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  title TEXT,
-                  author TEXT,
-                  language TEXT,
-                  main_subject TEXT,
-                  secondary_subject TEXT,
-                  isbn TEXT UNIQUE,
-                  ddc TEXT)''')
-    conn.commit()
-    conn.close()
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
 
-init_db()
+# Database initialization function
+def init_db():
+    db_path = 'library.db'
+    try:
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        c.execute('''CREATE TABLE IF NOT EXISTS books
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                      title TEXT,
+                      author TEXT,
+                      language TEXT,
+                      main_subject TEXT,
+                      secondary_subject TEXT,
+                      isbn TEXT UNIQUE,
+                      ddc TEXT)''')
+        conn.commit()
+        conn.close()
+        logging.info(f"Database initialized successfully at {db_path}")
+    except sqlite3.Error as e:
+        logging.error(f"Database initialization error: {e}")
+        raise
+
+# Call init_db() when the application starts
+with app.app_context():
+    init_db()
 
 # Simplified DDC classification with secondary subjects
 ddc_classes = {
@@ -246,12 +259,16 @@ def add_book():
 @app.route('/search')
 def search():
     query = request.args.get('query', '')
-    conn = sqlite3.connect('library.db')
-    c = conn.cursor()
-    c.execute("SELECT * FROM books WHERE title LIKE ? OR author LIKE ? OR main_subject LIKE ? OR secondary_subject LIKE ? OR isbn LIKE ? OR ddc LIKE ?",
-              ('%'+query+'%', '%'+query+'%', '%'+query+'%', '%'+query+'%', '%'+query+'%', '%'+query+'%'))
-    results = c.fetchall()
-    conn.close()
+    try:
+        conn = sqlite3.connect('library.db')
+        c = conn.cursor()
+        c.execute("SELECT * FROM books WHERE title LIKE ? OR author LIKE ? OR main_subject LIKE ? OR secondary_subject LIKE ? OR isbn LIKE ? OR ddc LIKE ?",
+                  ('%'+query+'%', '%'+query+'%', '%'+query+'%', '%'+query+'%', '%'+query+'%', '%'+query+'%'))
+        results = c.fetchall()
+        conn.close()
+    except sqlite3.Error as e:
+        logging.error(f"Database error in search: {e}")
+        results = []
 
     return render_template_string('''
 <!DOCTYPE html>
