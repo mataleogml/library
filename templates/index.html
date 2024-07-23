@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Library Manager</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.3/css/bulma.min.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <style>
+        .tab-content {
+            display: none;
+        }
+        .tab-content.is-active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+<section class="section">
+    <div class="container">
+        <h1 class="title">Library Manager</h1>
+        
+        <div class="tabs">
+            <ul>
+                <li class="is-active"><a data-tab="add-book">Add a Book</a></li>
+                <li><a data-tab="search-books">Search Books</a></li>
+            </ul>
+        </div>
+
+        <div id="add-book" class="tab-content is-active">
+            <h2 class="subtitle">Add a Book</h2>
+            <form id="addBookForm">
+                <div class="field">
+                    <label class="label">Title</label>
+                    <div class="control">
+                        <input class="input" type="text" name="title" id="title" required>
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label">Author</label>
+                    <div class="control">
+                        <input class="input" type="text" name="author" id="author" required>
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label">Language</label>
+                    <div class="control">
+                        <input class="input" type="text" name="language" required>
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label">Main Subject</label>
+                    <div class="control">
+                        <div class="select">
+                            <select name="main_subject" id="main_subject" required>
+                                <option value="">Select main subject</option>
+                                {% for subject in ddc_classes %}
+                                    <option value="{{ subject }}">{{ subject }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label">Secondary Subject</label>
+                    <div class="control">
+                        <div class="select">
+                            <select name="secondary_subject" id="secondary_subject" required>
+                                <option value="">Select secondary subject</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label">ISBN</label>
+                    <div class="control">
+                        <input class="input" type="text" name="isbn" required>
+                    </div>
+                </div>
+                <div class="field">
+                    <div class="control">
+                        <button class="button is-primary" type="submit">Add Book</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div id="search-books" class="tab-content">
+            <h2 class="subtitle">Search Books</h2>
+            <div class="field">
+                <div class="control">
+                    <input class="input" type="text" id="searchInput" placeholder="Search for books...">
+                </div>
+            </div>
+            <div id="searchResults"></div>
+        </div>
+    </div>
+</section>
+
+<script>
+    $(document).ready(function() {
+        // Tab functionality
+        $('.tabs li').on('click', function() {
+            var tab = $(this).find('a').attr('data-tab');
+            
+            $('.tabs li').removeClass('is-active');
+            $(this).addClass('is-active');
+            
+            $('.tab-content').removeClass('is-active');
+            $('#' + tab).addClass('is-active');
+        });
+
+        // Autocomplete for title
+        $.getJSON('/get_titles', function(data) {
+            $("#title").autocomplete({
+                source: data
+            });
+        });
+        
+        // Autocomplete for author
+        $.getJSON('/get_authors', function(data) {
+            $("#author").autocomplete({
+                source: data
+            });
+        });
+        
+        // Populate secondary subjects based on main subject
+        $('#main_subject').change(function() {
+            var main_subject = $(this).val();
+            if(main_subject) {
+                $.getJSON('/get_secondary_subjects/' + main_subject, function(data) {
+                    var options = '<option value="">Select secondary subject</option>';
+                    for(var i = 0; i < data.length; i++) {
+                        options += '<option value="' + data[i] + '">' + data[i] + '</option>';
+                    }
+                    $('#secondary_subject').html(options);
+                });
+            } else {
+                $('#secondary_subject').html('<option value="">Select secondary subject</option>');
+            }
+        });
+        
+        // Add book form submission
+        $('#addBookForm').submit(function(e) {
+            e.preventDefault();
+            $.post('/add_book', $(this).serialize(), function(response) {
+                if(response.status === 'success') {
+                    alert('Book added successfully. DDC: ' + response.ddc);
+                    $('#addBookForm')[0].reset();
+                } else {
+                    alert('Error: ' + response.message);
+                }
+            });
+        });
+
+        // Search functionality
+        $('#searchInput').on('input', function() {
+            var query = $(this).val();
+            if(query.length > 2) {
+                $.get('/search?q=' + query, function(data) {
+                    var results = '<table class="table is-fullwidth">';
+                    results += '<thead><tr><th>Title</th><th>Author</th><th>Language</th><th>Main Subject</th><th>Secondary Subject</th><th>ISBN</th><th>DDC</th><th>Action</th></tr></thead><tbody>';
+                    data.forEach(function(book) {
+                        results += '<tr>';
+                        results += '<td>' + book.title + '</td>';
+                        results += '<td>' + book.author + '</td>';
+                        results += '<td>' + book.language + '</td>';
+                        results += '<td>' + book.main_subject + '</td>';
+                        results += '<td>' + book.secondary_subject + '</td>';
+                        results += '<td>' + book.isbn + '</td>';
+                        results += '<td>' + book.ddc + '</td>';
+                        results += '<td><button class="button is-small is-info edit-book" data-id="' + book.id + '">Edit</button></td>';
+                        results += '</tr>';
+                    });
+                    results += '</tbody></table>';
+                    $('#searchResults').html(results);
+                });
+            }
+        });
+    });
+</script>
+</body>
+</html>
