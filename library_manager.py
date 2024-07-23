@@ -219,6 +219,40 @@ def home():
                 });
             });
             
+            $(document).on('click', '.edit-book', function() {
+    var bookId = $(this).data('id');
+    $.get('/edit_book/' + bookId, function(book) {
+        // Populate the form with book data
+        $('#title').val(book.title);
+        $('#author').val(book.author);
+        $('input[name="language"]').val(book.language);
+        $('#main_subject').val(book.main_subject).trigger('change');
+        setTimeout(function() {
+            $('#secondary_subject').val(book.secondary_subject);
+        }, 100);
+        $('input[name="isbn"]').val(book.isbn);
+        
+        // Change the form submission to update instead of add
+        $('#addBookForm').off('submit').on('submit', function(e) {
+            e.preventDefault();
+            $.post('/edit_book/' + bookId, $(this).serialize(), function(response) {
+                if(response.status === 'success') {
+                    alert('Book updated successfully.');
+                    // Reset the form and reload search results
+                    $('#addBookForm')[0].reset();
+                    $('#searchInput').trigger('input');
+                } else {
+                    alert('Error: ' + response.message);
+                }
+            });
+        });
+        
+        // Switch to the Add Book tab
+        $('.tabs li:first-child a').click();
+    });
+});
+            
+            
             // Tab functionality
             $('.tabs li').on('click', function() {
                 var tab = $(this).find('a').attr('data-tab');
@@ -363,10 +397,10 @@ def search():
     try:
         db = get_db()
         cursor = db.cursor()
-        cursor.execute("SELECT title, author, language, main_subject, secondary_subject, isbn, ddc FROM books WHERE title LIKE ? OR author LIKE ? OR isbn LIKE ?", 
+        cursor.execute("SELECT id, title, author, language, main_subject, secondary_subject, isbn, ddc FROM books WHERE title LIKE ? OR author LIKE ? OR isbn LIKE ?", 
                        ('%'+query+'%', '%'+query+'%', '%'+query+'%'))
-        books = [{'title': row[0], 'author': row[1], 'language': row[2], 'main_subject': row[3], 
-                  'secondary_subject': row[4], 'isbn': row[5], 'ddc': row[6]} for row in cursor.fetchall()]
+        books = [{'id': row[0], 'title': row[1], 'author': row[2], 'language': row[3], 'main_subject': row[4], 
+                  'secondary_subject': row[5], 'isbn': row[6], 'ddc': row[7]} for row in cursor.fetchall()]
         return jsonify(books)
     except Exception as e:
         logging.error(f"Error searching books: {e}")
